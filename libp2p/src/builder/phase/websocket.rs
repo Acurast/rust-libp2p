@@ -24,7 +24,7 @@ pub struct WebsocketPhase<T> {
 }
 
 macro_rules! impl_websocket_builder {
-    ($providerKebabCase:literal, $providerPascalCase:ty, $dnsTcp:expr, $websocketStream:ty) => {
+    ($builder_name:ident, $providerKebabCase:literal, $providerPascalCase:ty, $dnsTcp:expr, $websocketStream:ty) => {
         /// Adds a websocket client transport.
         ///
         /// Note that both `security_upgrade` and `multiplexer_upgrade` take function pointers,
@@ -48,7 +48,7 @@ macro_rules! impl_websocket_builder {
         /// ```
         #[cfg(all(not(target_arch = "wasm32"), feature = $providerKebabCase, feature = "websocket"))]
         impl<T> SwarmBuilder<$providerPascalCase, WebsocketPhase<T>> {
-            pub async fn with_websocket<
+            pub async fn $builder_name<
                 SecUpgrade,
                 SecStream,
                 SecError,
@@ -116,6 +116,7 @@ macro_rules! impl_websocket_builder {
 }
 
 impl_websocket_builder!(
+    with_websocket,
     "async-std",
     super::provider::AsyncStd,
     libp2p_dns::async_std::Transport::system(libp2p_tcp::async_io::Transport::new(
@@ -126,6 +127,7 @@ impl_websocket_builder!(
     >
 );
 impl_websocket_builder!(
+    with_websocket,
     "tokio",
     super::provider::Tokio,
     // Note this is an unnecessary await for Tokio Websocket (i.e. tokio dns) in order to be
@@ -133,6 +135,19 @@ impl_websocket_builder!(
     futures::future::ready(libp2p_dns::tokio::Transport::system(
         libp2p_tcp::tokio::Transport::new(libp2p_tcp::Config::default())
     )),
+    rw_stream_sink::RwStreamSink<libp2p_websocket::BytesConnection<libp2p_tcp::tokio::TcpStream>>
+);
+impl_websocket_builder!(
+    with_websocket_custom,
+    "tokio",
+    super::provider::Tokio,
+    // Note this is an unnecessary await for Tokio Websocket (i.e. tokio dns) in order to be
+    // consistent with above AsyncStd construction.
+    futures::future::ready(Ok(libp2p_dns::tokio::Transport::custom(
+        libp2p_tcp::tokio::Transport::new(libp2p_tcp::Config::default()),
+        libp2p_dns::ResolverConfig::default(),
+        libp2p_dns::ResolverOpts::default(),
+    ))),
     rw_stream_sink::RwStreamSink<libp2p_websocket::BytesConnection<libp2p_tcp::tokio::TcpStream>>
 );
 
